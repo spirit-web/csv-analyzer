@@ -12,6 +12,9 @@ function App() {
   const [filnamn, setFilnamn] = useState("")
   // anteckning — texten användaren skriver i antecknings-fältet
   const [anteckning, setAnteckning] = useState("")
+  // redigeraId håller ID numret för den observation som redigeras just nu
+  // null betyder att inget redigeras och att vi är i ett skapa nytt läge
+  const [redigeraId, setRedigeraId] = useState(null)
 
   // Hämtar alla observationer från backend med GET-request
   // Sparar resultatet i observations-state så listan uppdateras på skärmen
@@ -26,19 +29,34 @@ function App() {
     hamtaObservationer()
   }, [])
 
-  // Skickar POST-request till backend när formuläret skickas
-  // e.preventDefault() stoppar sidan från att laddas om vid formulärskickning
-  // Efter skapandet töms fälten och listan hämtas på nytt
-  async function skapaObservation(e) {
-    e.preventDefault()
+// Hanterar både POST (skapa ny) och PUT (uppdatera befintlig)
+// Om redigeraId är null skapas en ny observation
+// Om redigeraId har ett värde uppdateras den observationen
+async function skapaEllerUppdateraObservation(e) {
+  e.preventDefault()
+
+  if (redigeraId) {
+    // PUT — uppdatera befintlig observation
+    // Template literal sätter in redigeraId i URL:en, ex. /observations/3
+    await axios.put(`http://localhost:8000/observations/${redigeraId}`, {
+      filnamn:    filnamn,
+      anteckning: anteckning
+    })
+    // Återställ till "skapa nytt"-läge efter uppdatering
+    setRedigeraId(null)
+  } else {
+    // POST — skapa ny observation
     await axios.post("http://localhost:8000/observations/", {
       filnamn:    filnamn,
       anteckning: anteckning
     })
-    setFilnamn("")
-    setAnteckning("")
-    hamtaObservationer()
   }
+
+  // Töm formulärfälten och hämta uppdaterad lista oavsett POST eller PUT
+  setFilnamn("")
+  setAnteckning("")
+  hamtaObservationer()
+}
 
   // Skickar DELETE-request till backend med observationens id
   // ${id} sätter in id-numret direkt i URL:en, t.ex. /observations/3
@@ -48,43 +66,72 @@ function App() {
     hamtaObservationer()
   }
 
+  // Fyller i formuläret med befintliga värden när användaren klickar "Redigera"
+  // setRedigeraId sparar vilket id som redigeras så PUT-requesten vet vilken rad som ska uppdateras
+  function startaRedigering(obs) {
+    setFilnamn(obs.filnamn)
+    setAnteckning(obs.anteckning)
+    setRedigeraId(obs.id)
+  }
+
   return (
-    <div>
-      <h1>CSV Analyzer</h1>
+  <div>
+    <h1>CSV Analyzer</h1>
 
-      {/* Formulär för att skapa ny observation */}
-      {/* onSubmit kör skapaObservation när användaren klickar på knappen */}
-      <form onSubmit={skapaObservation}>
+    {/* Formulärets rubrik ändras beroende på läge */}
+    {/* Om redigeraId finns visar vi "Redigera" annars "Ny observation" */}
+    <h2>{redigeraId ? "Redigera observation" : "Ny observation"}</h2>
 
-        {/* value={filnamn} kopplar fältet till React-state */}
-        {/* onChange uppdaterar state varje gång användaren skriver ett tecken */}
-        <input
-          placeholder="Filnamn"
-          value={filnamn}
-          onChange={e => setFilnamn(e.target.value)}
-        />
-        <input
-          placeholder="Anteckning"
-          value={anteckning}
-          onChange={e => setAnteckning(e.target.value)}
-        />
-        <button type="submit">Skapa observation</button>
-      </form>
+    {/* onSubmit kör nu skapaEllerUppdateraObservation */}
+    <form onSubmit={skapaEllerUppdateraObservation}>
+      <input
+        placeholder="Filnamn"
+        value={filnamn}
+        onChange={e => setFilnamn(e.target.value)}
+      />
+      <input
+        placeholder="Anteckning"
+        value={anteckning}
+        onChange={e => setAnteckning(e.target.value)}
+      />
 
-      {/* Loopar igenom listan och visar varje observation */}
-      {/* key={obs.id} krävs av React för att hålla koll på varje element i listan */}
-      {observations.map(obs => (
-        <div key={obs.id}>
-          <strong>{obs.filnamn}</strong>
-          <p>{obs.anteckning}</p>
-          {/* onClick anropar taBortObservation med just den här observationens id */}
-          <button onClick={() => taBortObservation(obs.id)}>
-            Ta bort
-          </button>
-        </div>
-      ))}
-    </div>
-  )
+      {/* Knappens text ändras också beroende på läge */}
+      <button type="submit">
+        {redigeraId ? "Spara ändringar" : "Skapa observation"}
+      </button>
+
+      {/* Avbryt-knapp visas bara när man redigerar */}
+      {/* Återställer formuläret till "skapa nytt"-läge utan att spara */}
+      {redigeraId && (
+        <button type="button" onClick={() => {
+          setRedigeraId(null)
+          setFilnamn("")
+          setAnteckning("")
+        }}>
+          Avbryt
+        </button>
+      )}
+    </form>
+
+    {/* Lista med observationer */}
+    {observations.map(obs => (
+      <div key={obs.id}>
+        <strong>{obs.filnamn}</strong>
+        <p>{obs.anteckning}</p>
+
+        {/* Redigera-knapp skickar hela obs-objektet till startaRedigering */}
+        <button onClick={() => startaRedigering(obs)}>
+          Redigera
+        </button>
+
+        {/* Ta bort-knapp skickar bara obs.id till taBortObservation */}
+        <button onClick={() => taBortObservation(obs.id)}>
+          Ta bort
+        </button>
+      </div>
+    ))}
+  </div>
+)
 }
 
 export default App
