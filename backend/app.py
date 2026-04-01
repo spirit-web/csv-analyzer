@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 # hämtar routern från observations.py och döper om den till observations_router för att namnet ska va tydligt när den kopplas till appen
 from routes.observations import router as observations_router
+from routes.analysis import router as analysis_router
+
 
 # Base.metadata håller information om alla klasser som ärver från Base vilket i detta fallet blir Observation classen
 # create_all() skapar alla tabeller som inte finns ännu. 
@@ -28,6 +30,7 @@ app.add_middleware(
 # denna kodrad kopplar alla endpoints från observations.py till appen.
 # uvicorn.run gör så att servern går att starta med python app.py
 app.include_router(observations_router)
+app.include_router(analysis_router)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
