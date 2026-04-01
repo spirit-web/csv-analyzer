@@ -15,6 +15,10 @@ function App() {
   // redigeraId håller ID numret för den observation som redigeras just nu
   // null betyder att inget redigeras och att vi är i ett skapa nytt läge
   const [redigeraId, setRedigeraId] = useState(null)
+  // statistik - som håller JSON från analysen
+  const [statistik, setStatistik] = useState(null)
+  // histogram som håller URL till bilden från analysen
+  const [histogram, setHistogram] = useState(null)
 
   // Hämtar alla observationer från backend med GET-request
   // Sparar resultatet i observations-state så listan uppdateras på skärmen
@@ -73,6 +77,27 @@ async function skapaEllerUppdateraObservation(e) {
     setAnteckning(obs.anteckning)
     setRedigeraId(obs.id)
   }
+  // Hanterar CSV uppladdningen
+  async function analyseraCSV(e) {
+    const fil = e.target.files[0]
+    if (!fil) return
+
+    const form = new FormData()
+    form.append("fil", fil)
+
+    // Hämtar statistik som JSON
+    const statsvar = await axios.post(
+      "http://localhost:8000/analysis/statistics", form
+    )
+    setStatistik(statsvar.data)
+
+    // Hämtar histogram som en bild
+    const bildsvar = await axios.post(
+      "http://localhost:8000/analysis/histogram", form,
+      { responseType: "blob" }
+    )
+    setHistogram(URL.createObjectURL(bildsvar.data))
+  }
 
   return (
   <div>
@@ -112,6 +137,37 @@ async function skapaEllerUppdateraObservation(e) {
         </button>
       )}
     </form>
+    {/* Fil-upload för CSV-analys */}
+{/* onChange körs direkt när användaren väljer en fil */}
+<div>
+  <h2>Analysera CSV</h2>
+  <input
+    type="file"
+    accept=".csv"
+    onChange={analyseraCSV}
+  />
+</div>
+
+{/* Visar statistik om den finns */}
+{statistik && (
+  <div>
+    <h3>Statistik</h3>
+    <p>Rader: {statistik.radata.rader}</p>
+    <p>Kolumner: {statistik.radata.namn.join(", ")}</p>
+    <p>Saknade värden: {JSON.stringify(statistik.datarening.saknade_varden)}</p>
+    <p>Duplikat: {statistik.datarening.duplikat}</p>
+  </div>
+)}
+
+{/* Visar histogram-bilden om den finns */}
+{/* histogram-state håller en URL som <img> kan visa direkt */}
+{histogram && (
+  <img
+    src={histogram}
+    alt="Histogram"
+    style={{ width: "100%", marginTop: "1rem" }}
+  />
+)}
 
     {/* Lista med observationer */}
     {observations.map(obs => (
